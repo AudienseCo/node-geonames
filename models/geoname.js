@@ -16,10 +16,10 @@ var GeonameSchema = new Schema({
 	country_code      : String, //ISO-3166 2-letter country code, 2 characters
 	//cc2               : String, //alternate country codes, comma separated, ISO-3166 2-letter country code, 60 characters
 	//admin1_code       : String, //fipscode (subject to change to iso code), see exceptions below, see file admin1Codes.txt for display names of this code; varchar(20)
-	//admin2_code       : String, //code for the second administrative division, a county in the US, see file admin2Codes.txt; varchar(80) 
+	//admin2_code       : String, //code for the second administrative division, a county in the US, see file admin2Codes.txt; varchar(80)
 	//admin3_code       : String, //code for third level administrative division, varchar(20)
 	//admin4_code       : String, //code for fourth level administrative division, varchar(20)
-	population        : Number, //bigint (8 byte int) 
+	population        : Number, //bigint (8 byte int)
 	//elevation         : Number, //in meters, integer
 	//dem               : Number, //digital elevation model, srtm3 or gtopo30, average elevation of 3''x3'' (ca 90mx90m) or 30''x30'' (ca 900mx900m) area in meters, integer. srtm processed by cgiar/ciat.
 	timezone          : String,  //the timezone id (see file timeZone.txt) varchar(40)
@@ -30,7 +30,7 @@ var GeonameSchema = new Schema({
 });
 
 GeonameSchema.statics.findByName = function(name, limit, cb) {
-	Geoname
+	this
 		.find()
 		//.select('name', 'alternatenames', 'country_code', 'feature_class', 'feature_code', 'population')
 		.where('alternatenames', name.toLowerCase())
@@ -42,7 +42,7 @@ GeonameSchema.statics.findByName = function(name, limit, cb) {
 }
 
 GeonameSchema.statics.findByNameAndUTCOffset = function(name, UTCOffset, limit, cb) {
-	Geoname
+	this
 		.find()
 		//.select('name', 'alternatenames', 'country_code', 'feature_class', 'feature_code', 'population')
 		.where('alternatenames', name.toLowerCase())
@@ -54,7 +54,7 @@ GeonameSchema.statics.findByNameAndUTCOffset = function(name, UTCOffset, limit, 
 }
 
 GeonameSchema.statics.findByCoords = function(lon, lat, limit, cb) {
-	Geoname
+	this
 		.find({loc: { $nearSphere: [lon, lat], $maxDistance: 0.01} })
 		.limit(limit)
 		.slaveOk()
@@ -62,23 +62,24 @@ GeonameSchema.statics.findByCoords = function(lon, lat, limit, cb) {
 }
 
 GeonameSchema.statics.add = function(data, cb) {
-	var geoname = new Geoname(data);
-	geoname.save(cb);	
+	var geoname = new this(data);
+	geoname.save(cb);
 }
 
 GeonameSchema.statics.doImport = function(file, cb) {
+	var self = this;
 	var imported = 0;
 	csv()
 		.from.path(file, {
 		  delimiter : '\t',
 		  columns : [
-		    '_id', 
-		    'name', 
-		    'asciiname', 
-		    'alternatenames', 
-		    'latitude', 
-		    'longitude', 
-		    'feature_class', 
+		    '_id',
+		    'name',
+		    'asciiname',
+		    'alternatenames',
+		    'latitude',
+		    'longitude',
+		    'feature_class',
 			'feature_code',
 			'country_code',
 			'cc2',
@@ -90,7 +91,7 @@ GeonameSchema.statics.doImport = function(file, cb) {
 			'elevation',
 			'dem',
 			'timezone',
-			'modification_date'				    
+			'modification_date'
 		  ]
 		})
 		.transform(function(data, index) {
@@ -100,7 +101,7 @@ GeonameSchema.statics.doImport = function(file, cb) {
 		      parseFloat(data.longitude),
 		      parseFloat(data.latitude)
 		    ];
-		    //data.modification_date = new Date(data.modification_date);		    		    
+		    //data.modification_date = new Date(data.modification_date);
 
 		    data.alternatenames = data.alternatenames ? data.alternatenames.split(',') : [];
 		    if (data.alternatenames.indexOf(data.name) == -1) data.alternatenames.push(data.name);
@@ -124,26 +125,24 @@ GeonameSchema.statics.doImport = function(file, cb) {
 		    	offset_gmt: timezone ? timezone.gmt_offset : null,
 		    	offset_dst: timezone ? timezone.dst_offset : null,
 		    	offset_raw: timezone ? timezone.raw_offset : null
-		    };  
+		    };
 		})
 		.on('record', function(data, index) {
 			if (data.feature_class == 'A' || data.feature_class == 'P') {
 				imported++;
-				console.log(imported, index, data);
-				Geoname.add(data);	
-			}	
+				self.add(data);
+			}
 		})
-		.on('end', function(count) {		  
+		.on('end', function(count) {
 		  cb(null, count, imported);
 		})
 		.on('error', function(err) {
 		  console.error(err);
 		  cb(err);
-		}); 			
+		});
 }
 
 exports = module.exports = function(uri) {
 	var conn = mongoose.createConnection(uri);
 	return conn.model('Geoname', GeonameSchema);
 }
-

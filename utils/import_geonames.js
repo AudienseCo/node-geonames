@@ -1,8 +1,3 @@
-var
-	mongoose = require('mongoose'),
-	async = require('async'), 	
-	Geoname = require('../models/Geoname');
-
 var argv = require('optimist')
   .usage('Usage: $0 -f [geonamesFile] -d [mongodb://localhost/database] -r false')
   .demand(['f', 'd', 'r'])
@@ -11,10 +6,13 @@ var argv = require('optimist')
   .alias('d', 'database')
   .describe('d', 'Mongo DB URI, e.g. mongodb://localhost/database')
   .alias('r', 'reset')
-  .describe('r', 'Where to clean the database before importing, use true to clean it')  
+  .describe('r', 'Where to clean the database before importing, use true to clean it')
   .argv;
 
-var db = mongoose.connect(argv.database);
+var
+	mongoose = require('mongoose'),
+	async = require('async'),
+	Geoname = require('../models/Geoname')(argv.database);
 
 function doImport(err) {
 	if (err) {
@@ -31,15 +29,15 @@ function doImport(err) {
 		var options = index.options || {};
 		index.collection.collection.ensureIndex(index.index, options, function(err, name) {
 			if (err) next(err);
-			console.log('created: ', name);
+			console.log('Index created: ', name);
 			next();
 		});
-		
+
 	}, function(err) {
 		if (err) throw err;
 		console.log('All done!');
-		
-	});	
+
+	});
 
 
 	Geoname.doImport(argv.file, function(err, count, imported) {
@@ -47,6 +45,6 @@ function doImport(err) {
 		console.log('Number of names imported: ' + count);
 		process.exit();
 	});
-}	
+}
 
-if (argv.reset === 'true') { Geoname.remove(doImport); } else doImport();
+if (argv.reset === 'true') { Geoname.remove().exec(doImport); } else doImport();
